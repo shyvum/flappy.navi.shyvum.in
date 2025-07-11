@@ -1,14 +1,11 @@
 // Game variables
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
-const scoreElement = document.getElementById('score');
 const gameOverElement = document.getElementById('gameOverInfo');
 const coinCountElement = document.getElementById('coinCount');
 const cashValueElement = document.getElementById('cashValue');
 const couponsElement = document.getElementById('coupons');
-const slowMotionCountElement = document.getElementById('slowMotionCount');
 const reviveCountElement = document.getElementById('reviveCount');
-const slowMotionBtn = document.getElementById('slowMotionBtn');
 const reviveBtn = document.getElementById('reviveBtn');
 
 // Load SVG assets
@@ -507,9 +504,6 @@ function handleSpaceKey() {
 function jump() {
     if (gameRunning) {
         bird.velocity = bird.jumpPower;
-        console.log('Bird jumped! Velocity:', bird.velocity);
-    } else {
-        console.log('Game not running, cannot jump');
     }
 }
 
@@ -571,34 +565,23 @@ function restartGame() {
 
 // Event listeners
 document.addEventListener('keydown', (e) => {
-    console.log('Key pressed:', e.code);
     if (e.code === 'Space' || e.key === ' ' || e.keyCode === 32) {
         e.preventDefault();
         handleSpaceKey();
     }
 });
 
-// Also listen for keyup to catch any missed events
-document.addEventListener('keyup', (e) => {
-    if (e.code === 'Space' || e.key === ' ' || e.keyCode === 32) {
-        e.preventDefault();
-    }
-});
-
 // Canvas click event
 canvas.addEventListener('click', (e) => {
-    console.log('Canvas clicked');
     jump();
 });
 
 // Make sure canvas can receive focus
 canvas.setAttribute('tabindex', '0');
-canvas.focus();
 
 // Add window focus to ensure events work
 window.addEventListener('load', () => {
     canvas.focus();
-    console.log('Game loaded and canvas focused');
 });
 
 // Handle window resize
