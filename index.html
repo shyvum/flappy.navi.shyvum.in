@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Navi Flappy Coupons - Collect coins and coupons while avoiding obstacles in this fun arcade game!">
+    <meta name="theme-color" content="#1F002A">
+    <title>Navi Flappy Coupons</title>
+    <link rel="icon" type="image/svg+xml" href="assets/coupon.svg">
+    <link rel="icon" type="image/png" href="assets/coupon.svg">
+    <link rel="apple-touch-icon" href="assets/coupon.svg">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Titillium+Web:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Purpleish Theme Color Palette */
+        :root {
+            /* Primary Purple Colors */
+            --primary-p0: #1F002A;  /* Deepest purple */
+            --primary-p10: #290932; /* Very dark purple */
+            --primary-on: #76529A;  /* Medium purple */
+            --primary-bright: #381763; /* Dark purple */
+            
+            /* Secondary Colors */
+            --secondary-s80: #290932;
+            --secondary-s60: #381763;
+            --secondary-s90: #1F002A;
+            --secondary-on: #76529A;
+            
+            /* Tertiary Colors */
+            --tertiary-s30: #76529A;
+            
+            /* Success Colors (Green Accent) */
+            --success-su40: #3EA45D;
+            --success-su90: rgba(62, 164, 93, 0.1);
+            --success-su10: #2A7A42;
+            
+            /* Error Colors */
+            --error-e30: #BD0000;
+            --error-e90: #FEECEC;
+            --error-e0: #570000;
+            
+            /* Notice Colors */
+            --notice-no40: #F7B500;
+            --notice-no90: #FEF8E5;
+            --notice-no10: #B06900;
+            
+            /* Surface Colors */
+            --surface-n100: #290932;
+            --surface-n90: #381763;
+            --surface-n80: #1F002A;
+            --surface-bg: linear-gradient(135deg, #1F002A 0%, #290932 50%, #381763 100%);
+            
+            /* On-Surface Colors - Updated for readability */
+            --on-surface-n0: #FFFFFF;
+            --on-surface-n20: #F5F5F5;
+            --on-surface-n30: #E4E4E4;
+            --on-surface-n40: #BBBBBB;
+            
+            /* Text Colors - White for readability on purple background */
+            --text-primary: #FFFFFF;
+            --text-secondary: #F5F5F5;
+            --text-tertiary: #E4E4E4;
+            
+            /* CTA Colors */
+            --cta-primary: #1F002A;
+            --cta-secondary: #F5F5F5;
+            
+            /* Product Accent - Cash Loan */
+            --accent-cl50: #AA3CE6;
+            --accent-cl90: #F9F1FD;
+            --accent-cl10: #3C0050;
+            
+            /* Shadows */
+            --shadow-primary: 0px 56.0832px 77.1144px -18.482px rgba(209, 217, 230, 0.51);
+            --shadow-elevation: rgba(209, 217, 230, 0.3);
+        }
+        
+        * {
+            box-sizing: border-box;
+        }
+        
+        body {
+            margin: 0;
+            padding: 0;
+            background: var(--secondary-s80);
+            font-family: 'Titillium Web', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            overflow: hidden;
+        }
+        
+        .game-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: var(--surface-bg);
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        .game-header {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            padding: 16px;
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(4px);
+        }
+        
+        .game-title {
+            font-family: 'Titillium Web';
+            font-style: normal;
+            font-weight: 600;
+            font-size: 18px;
+            line-height: 24px;
+            color: var(--cta-primary);
+            margin: 0;
+            text-align: center;
+        }
+        
+        .stats-container {
+            display: flex;
+            flex-direction: row;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+            width: 100%;
+        }
+        
+        .game-area {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        canvas {
+            border: none;
+            border-radius: 0;
+            box-shadow: none;
+            background: linear-gradient(135deg, #1F002A 0%, #290932 50%, #381763 100%);
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+        
+        .game-controls {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            padding: 16px;
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(4px);
+        }
+        
+        .stat-item {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            justify-content: center;
+            padding: 8px 12px;
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            color: var(--cta-primary);
+            font-family: 'Titillium Web';
+            font-style: normal;
+            font-weight: 600;
+            font-size: 14px;
+            line-height: 16px;
+            text-align: center;
+            flex: 1;
+            min-width: 70px;
+            gap: 6px;
+        }
+        
+        .stat-item:first-child {
+            flex: 2; /* 50% of space (2 out of 4 total flex units) */
+        }
+        
+        .stat-item:nth-child(2),
+        .stat-item:nth-child(3) {
+            flex: 1; /* 25% of space each (1 out of 4 total flex units) */
+        }
+        
+        .stat-item img {
+            max-width: 16px;
+            max-height: 16px;
+            width: auto;
+            height: auto;
+            object-fit: contain;
+            object-position: center;
+            flex-shrink: 0;
+            display: block;
+            /* Preserve natural aspect ratio */
+            aspect-ratio: auto;
+        }
+        
+        .stat-item span {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--cta-primary);
+            margin-top: 2px;
+        }
+        
+        .power-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 8px 16px;
+            background: #1F002A;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: 'Titillium Web';
+            font-style: normal;
+            font-weight: 600;
+            font-size: 12px;
+            line-height: 16px;
+            color: #FFFFFF;
+            min-width: 80px;
+            min-height: 32px;
+            touch-action: manipulation;
+        }
+        
+        .power-btn:hover {
+            background: #290932;
+        }
+        
+        .power-btn:disabled {
+            background: var(--cta-secondary);
+            cursor: not-allowed;
+            color: var(--cta-primary);
+            opacity: 0.6;
+        }
+        
+        .revive {
+            background: #1F002A;
+            color: #FFFFFF;
+        }
+        
+        .revive:hover {
+            background: #290932;
+        }
+        
+
+        
+        .game-over {
+            display: none;
+        }
+        
+        .game-over h2 {
+            font-family: 'Titillium Web';
+            font-style: normal;
+            font-weight: 600;
+            font-size: 24px;
+            line-height: 32px;
+            color: var(--cta-primary);
+            margin: 0 0 16px 0;
+        }
+        
+        .game-over p {
+            font-family: 'Titillium Web';
+            font-style: normal;
+            font-weight: 400;
+            font-size: 16px;
+            line-height: 24px;
+            color: var(--text-primary);
+            margin: 0 0 24px 0;
+        }
+        
+        .restart-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 8px 16px;
+            background: #1F002A;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: 'Titillium Web';
+            font-style: normal;
+            font-weight: 600;
+            font-size: 12px;
+            line-height: 16px;
+            color: #FFFFFF;
+            min-width: 80px;
+            min-height: 32px;
+            touch-action: manipulation;
+        }
+        
+        .restart-btn:hover {
+            background: #290932;
+        }
+        
+        .game-over-info {
+            position: fixed;
+            bottom: 16px;
+            left: 16px;
+            right: 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+            padding: 24px 32px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 12px;
+            backdrop-filter: blur(8px);
+            box-shadow: 0 8px 32px rgba(31, 0, 42, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            z-index: 1000;
+        }
+        
+        .game-over-buttons {
+            display: flex;
+            flex-direction: row;
+            justify-content: center;
+            align-items: center;
+            gap: 16px;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <!-- Full-screen Game Area -->
+        <div class="game-area">
+            <canvas id="gameCanvas" tabindex="0" style="outline: none;"></canvas>
+        </div>
+        
+        <!-- Overlay Header -->
+        <div class="game-header">
+            <div class="stats-container">
+                <div class="stat-item">
+                    <img src="assets/coin.svg" width="16" height="16" alt="Coin">
+                    <span id="coinCount">0</span>
+                    <span>=</span>
+                    <img src="assets/cash.svg" width="16" height="16" alt="Cash">
+                    <span id="cashValue">0</span>
+                </div>
+                <div class="stat-item">
+                    <img src="assets/coupon.svg" width="16" height="16" alt="Coupon">
+                    <span id="coupons">0</span>
+                </div>
+                <div class="stat-item">
+                    <img src="assets/life.svg" width="16" height="16" alt="Life">
+                    <span id="reviveCount">1</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Start Game Floating Island -->
+        <div class="game-over-info" id="startGameInfo" style="display: block;">
+            <h2 style="font-family: 'Titillium Web'; font-weight: 600; font-size: 24px; color: var(--cta-primary); margin: 0 0 16px 0; text-align: center; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                <img src="assets/coupon.svg" width="24" height="25" alt="Coupon" style="flex-shrink: 0;">
+                Flappy Coupons
+            </h2>
+            <p style="font-family: 'Titillium Web'; font-weight: 400; font-size: 16px; color: var(--cta-primary); margin: 0 0 24px 0; text-align: center;">Collect coins and coupons while avoiding obstacles!</p>
+            <div class="game-over-buttons">
+                <button class="restart-btn" id="startGameBtn" onclick="startGame()">🚀 Start Game</button>
+            </div>
+        </div>
+        
+        <!-- Game Over Floating Island -->
+        <div class="game-over-info" id="gameOverInfo" style="display: none;">
+            <div class="game-over-buttons">
+                <button class="power-btn revive" id="reviveBtn" onclick="useRevive()" style="display: none;">Revive</button>
+                <button class="restart-btn" onclick="restartGame()">Restart</button>
+            </div>
+        </div>
+    </div>
+    
+    <script src="game.js"></script>
+</body>
+</html>
