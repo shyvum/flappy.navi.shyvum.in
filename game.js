@@ -7,6 +7,8 @@ const cashValueElement = document.getElementById('cashValue');
 const couponsElement = document.getElementById('coupons');
 const reviveCountElement = document.getElementById('reviveCount');
 const reviveBtn = document.getElementById('reviveBtn');
+const connectionStatusElement = document.getElementById('connectionStatus');
+const statusTextElement = document.getElementById('statusText');
 
 // Load SVG assets
 const coinImage = new Image();
@@ -45,13 +47,40 @@ let coinObjects = [];
 let couponObjects = [];
 let particles = [];
 
-// Game constants
+// Game constants (will be set from API only)
 const pipeWidth = 60;
-const pipeGap = 300;
-const basePipeSpeed = 0.8; // Base speed
+let pipeGap = null; // vertical_pipe_gap from API
+let basePipeSpeed = null; // bird_speed from API (converted)
 const maxPipeSpeed = 2.0; // Maximum speed cap
 const speedIncreaseRate = 0.02; // Speed increase per point
-const pipeSpacing = 350; // Equal horizontal spacing between pipes
+let pipeSpacing = null; // horizontal_pipe_gap from API
+let coinSpacing = null; // coin_distance from API
+let couponSpacing = null; // coupon_distance from API
+
+// Game parameters from API (will be set when API loads)
+let gameParameters = null;
+let apiInitialized = false;
+
+// Update game parameters from API
+function updateGameParameters() {
+    if (window.gameAPI && window.gameAPI.isAPIInitialized()) {
+        const apiParams = window.gameAPI.getGameParameters();
+        gameParameters = apiParams;
+        
+        // Update game constants based on API parameters
+        pipeGap = apiParams.vertical_pipe_gap;
+        basePipeSpeed = apiParams.bird_speed / 20; // Convert bird_speed to game speed
+        pipeSpacing = apiParams.horizontal_pipe_gap;
+        coinSpacing = apiParams.coin_distance;
+        couponSpacing = apiParams.coupon_distance;
+        
+        apiInitialized = true;
+        
+        // Update UI to show game is ready
+        updateConnectionStatus();
+        enableStartButton();
+    }
+}
 
 // Dynamic speed calculation
 function getCurrentSpeed() {
@@ -71,12 +100,37 @@ function resizeCanvas() {
 function init() {
     resizeCanvas();
     updateUI();
+    updateConnectionStatus();
+    enableStartButton(); // Initially disabled
+    
+    // Set up API callback to update parameters when loaded
+    if (window.gameAPI) {
+        window.gameAPI.onInitialized(() => {
+            updateGameParameters();
+        });
+    } else {
+        // Wait for API service to be available
+        setTimeout(() => {
+            if (window.gameAPI) {
+                window.gameAPI.onInitialized(() => {
+                    updateGameParameters();
+                });
+            }
+        }, 1000);
+    }
+    
     // Start the game loop for background rendering, but game logic waits for start button
     gameLoop();
 }
 
 // Start the game when button is clicked
 function startGame() {
+    // Check if API is initialized before starting
+    if (!apiInitialized || !gameParameters) {
+        alert('Please wait for game parameters to load from server...');
+        return;
+    }
+    
     gameStarted = true;
     gameRunning = true;
     
@@ -87,12 +141,58 @@ function startGame() {
     bird.y = canvas.height / 2;
     bird.velocity = 0;
     
-    // Create first pipe safely positioned to avoid mobile collision
-    // Ensure pipe is at least 200px to the right of bird's starting position
+    // Reset game state
+    score = 0;
+    coins = 0;
+    coupons = 0;
+    
+    // Create first pipe safely positioned using API parameters
     const safeDistance = Math.max(bird.x + 200, canvas.width - pipeSpacing);
     createPipe(safeDistance);
     
-    // Game loop is already running, no need to call it again
+    updateUI();
+}
+
+// Enable/disable start button based on API status
+function enableStartButton() {
+    const startBtn = document.getElementById('startGameBtn');
+    if (apiInitialized) {
+        startBtn.disabled = false;
+        startBtn.textContent = '🚀 Start Game';
+        startBtn.style.opacity = '1';
+    } else {
+        startBtn.disabled = true;
+        startBtn.textContent = '⏳ Loading...';
+        startBtn.style.opacity = '0.6';
+    }
+}
+
+// Update connection status indicator (optional UI element)
+function updateConnectionStatus() {
+    try {
+        if (!statusTextElement || !connectionStatusElement) {
+            return;
+        }
+        
+        if (!window.gameAPI) {
+            statusTextElement.textContent = '⚠️ API Loading...';
+            connectionStatusElement.style.backgroundColor = 'rgba(255, 193, 7, 0.2)';
+            return;
+        }
+
+        if (apiInitialized) {
+            statusTextElement.textContent = '🟢 Ready';
+            connectionStatusElement.style.backgroundColor = 'rgba(40, 167, 69, 0.2)';
+        } else if (window.gameAPI.isServiceOnline()) {
+            statusTextElement.textContent = '🔄 Loading...';
+            connectionStatusElement.style.backgroundColor = 'rgba(255, 193, 7, 0.2)';
+        } else {
+            statusTextElement.textContent = '🔴 Failed';
+            connectionStatusElement.style.backgroundColor = 'rgba(220, 53, 69, 0.2)';
+        }
+    } catch (error) {
+        // Silently ignore connection status UI errors
+    }
 }
 
 // Update UI elements
