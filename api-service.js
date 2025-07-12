@@ -65,6 +65,7 @@ class GameAPIService {
             
             if (flappyBirdGame && flappyBirdGame.gameParameterValues) {
                 const apiParams = flappyBirdGame.gameParameterValues;
+                const winningCriteria = flappyBirdGame.winningCriteria || {};
                 
                 // Set game parameters ONLY from API - no defaults
                 this.gameParameters = {
@@ -73,6 +74,12 @@ class GameAPIService {
                     coupon_distance: apiParams.coupon_distance,
                     vertical_pipe_gap: apiParams.vertical_pipe_gap,
                     horizontal_pipe_gap: apiParams.horizontal_pipe_gap
+                };
+                
+                // Set winning criteria from API - no defaults
+                this.winningCriteria = {
+                    coins: winningCriteria.COINS,
+                    coupons: winningCriteria.COUPONS
                 };
                 
 
@@ -87,63 +94,8 @@ class GameAPIService {
             this.isOnline = true;
             return data;
         } catch (error) {
-            // Use fallback data based on your provided API response
-            const fallbackData = {
-                "customerId": "shivam",
-                "games": [{
-                    "gameInstanceId": "b3d66f06-6d47-4896-8bfc-2706686b3dd0",
-                    "gameInstanceName": "MEDIUM",
-                    "gameInstanceDescription": "medium settings",
-                    "gameTemplateId": "9204b6ec-16f4-46d6-a735-6805fb6e6c1e",
-                    "gameTemplateName": "FLAPPY_BIRD",
-                    "gameParameterValues": {
-                        "bird_speed": 15,
-                        "coin_distance": 250,
-                        "coupon_distance": 500,
-                        "vertical_pipe_gap": 250,
-                        "horizontal_pipe_gap": 500
-                    },
-                    "isActive": true,
-                    "activeGameSession": null,
-                    "canResume": false
-                }],
-                "syncTimestamp": "2025-07-12T06:29:43.810458"
-            };
-            
-            // Process fallback data same as API response
-            const data = fallbackData;
-            
-            // Find the FLAPPY_BIRD game template
-            let flappyBirdGame = null;
-            if (data.games && data.games.length > 0) {
-                flappyBirdGame = data.games.find(game => 
-                    game.gameTemplateName === 'FLAPPY_BIRD'
-                );
-            }
-            
-            if (flappyBirdGame && flappyBirdGame.gameParameterValues) {
-                const apiParams = flappyBirdGame.gameParameterValues;
-                
-                // Set game parameters from fallback data
-                this.gameParameters = {
-                    bird_speed: apiParams.bird_speed,
-                    coin_distance: apiParams.coin_distance,
-                    coupon_distance: apiParams.coupon_distance,
-                    vertical_pipe_gap: apiParams.vertical_pipe_gap,
-                    horizontal_pipe_gap: apiParams.horizontal_pipe_gap
-                };
-                
-
-                
-                // Store the game instance ID for session updates
-                this.gameInstanceId = flappyBirdGame.gameInstanceId;
-                this.isOnline = true; // Mark as online since we have data
-                
-                return data;
-            } else {
-                this.isOnline = false;
-                throw new Error('FLAPPY_BIRD template not found in fallback data');
-            }
+            this.isOnline = false;
+            throw error;
         }
     }
 
@@ -193,6 +145,13 @@ class GameAPIService {
      */
     getGameParameters() {
         return this.gameParameters;
+    }
+
+    /**
+     * Get winning criteria
+     */
+    getWinningCriteria() {
+        return this.winningCriteria;
     }
 
     /**

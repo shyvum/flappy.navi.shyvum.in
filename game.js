@@ -5,7 +5,7 @@ const gameOverElement = document.getElementById('gameOverInfo');
 const coinCountElement = document.getElementById('coinCount');
 const cashValueElement = document.getElementById('cashValue');
 const couponsElement = document.getElementById('coupons');
-const reviveCountElement = document.getElementById('reviveCount');
+
 const reviveBtn = document.getElementById('reviveBtn');
 const connectionStatusElement = document.getElementById('connectionStatus');
 const statusTextElement = document.getElementById('statusText');
@@ -26,8 +26,8 @@ let coins = 0;
 let coupons = 0;
 let reviveCount = 5;
 
-// Coupon system configuration - win condition
-const couponsToWin = 4;
+// Coupon system configuration - win condition (will be set from API only)
+let couponsToWin = null; // Will be set from API only
 
 // Bird object
 const bird = {
@@ -65,6 +65,7 @@ let apiInitialized = false;
 function updateGameParameters() {
     if (window.gameAPI && window.gameAPI.isAPIInitialized()) {
         const apiParams = window.gameAPI.getGameParameters();
+        const winningCriteria = window.gameAPI.getWinningCriteria();
         gameParameters = apiParams;
         
         // Update game constants based on API parameters
@@ -74,11 +75,17 @@ function updateGameParameters() {
         coinSpacing = apiParams.coin_distance;
         couponSpacing = apiParams.coupon_distance;
         
+        // Update winning criteria from API
+        if (winningCriteria) {
+            couponsToWin = winningCriteria.coupons;
+        }
+        
         apiInitialized = true;
         
-        // Update UI to show game is ready
+        // Update UI to show game is ready and correct values
         updateConnectionStatus();
         enableStartButton();
+        updateUI(); // Update UI with loaded values
     }
 }
 
@@ -201,8 +208,7 @@ function updateUI() {
     coinCountElement.textContent = coins;
     const cashValue = (coins / 10).toFixed(1);
     cashValueElement.textContent = `₹${cashValue}`;
-    couponsElement.textContent = `${coupons}/${couponsToWin}`;
-    reviveCountElement.textContent = reviveCount;
+    couponsElement.textContent = `${coupons}/${couponsToWin || '?'}`;
     
     reviveBtn.style.display = gameRunning ? 'none' : 'inline-block';
     reviveBtn.disabled = reviveCount <= 0;
@@ -368,8 +374,8 @@ function updateCoupons() {
             createParticles(coupon.x + coupon.width/2, coupon.y + coupon.height/2, '#FF69B4', 10);
             updateUI();
             
-            // Check win condition - player wins when collecting 4 coupons
-            if (coupons >= 4) {
+            // Check win condition - player wins when collecting required coupons
+            if (coupons >= couponsToWin) {
                 gameWin();
             }
         }
@@ -628,11 +634,11 @@ function useRevive() {
     }
 }
 
-// Game win - player collected 4 coupons
+// Game win - player collected required coupons
 function gameWin() {
     gameRunning = false;
     // Show win message instead of game over
-    alert('🎉 Congratulations! You collected 4 coupons and won the game! 🎉');
+    alert(`🎉 Congratulations! You collected ${couponsToWin} coupons and won the game! 🎉`);
     document.getElementById('gameOverInfo').style.display = 'block';
     updateUI();
 }
