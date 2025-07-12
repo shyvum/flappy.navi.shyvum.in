@@ -25,6 +25,7 @@ let score = 0;
 let coins = 0;
 let coupons = 0;
 let reviveCount = 5;
+let reviveUsedInSession = false; // Track if revive was used in current session
 
 // Coupon system configuration - win condition (will be set from API only)
 let couponsToWin = null; // Will be set from API only
@@ -82,11 +83,30 @@ function updateGameParameters() {
         
         apiInitialized = true;
         
+        // Check if game can be resumed
+        if (window.gameAPI.canResumeGame()) {
+            showResumeOption();
+        } else {
+            showNewGameOption();
+        }
+        
         // Update UI to show game is ready and correct values
         updateConnectionStatus();
         enableStartButton();
         updateUI(); // Update UI with loaded values
     }
+}
+
+// Called when sync completes after session update
+function onSyncComplete() {
+    // Update game parameters and UI after sync
+    updateGameParameters();
+    
+    // Update UI to reflect new revival options
+    updateUI();
+    
+    // Update connection status
+    updateConnectionStatus();
 }
 
 // Dynamic speed calculation
@@ -110,18 +130,16 @@ function init() {
     updateConnectionStatus();
     enableStartButton(); // Initially disabled
     
-    // Set up API callback to update parameters when loaded
+    // Initialize API and set callbacks
     if (window.gameAPI) {
-        window.gameAPI.onInitialized(() => {
-            updateGameParameters();
-        });
+        window.gameAPI.onInitialized(updateGameParameters);
+        window.gameAPI.onSyncComplete(onSyncComplete);
     } else {
         // Wait for API service to be available
         setTimeout(() => {
             if (window.gameAPI) {
-                window.gameAPI.onInitialized(() => {
-                    updateGameParameters();
-                });
+                window.gameAPI.onInitialized(updateGameParameters);
+                window.gameAPI.onSyncComplete(onSyncComplete);
             }
         }, 1000);
     }
@@ -152,6 +170,7 @@ function startGame() {
     score = 0;
     coins = 0;
     coupons = 0;
+    reviveUsedInSession = false; // Reset revive tracking for new session
     
     // Create first pipe safely positioned using API parameters
     const safeDistance = Math.max(bird.x + 200, canvas.width - pipeSpacing);
@@ -160,12 +179,63 @@ function startGame() {
     updateUI();
 }
 
+// Resume game from saved session
+function resumeGame() {
+    // Check if API is initialized and can resume
+    if (!apiInitialized || !gameParameters || !window.gameAPI.canResumeGame()) {
+        alert('Cannot resume game - session data not available');
+        return;
+    }
+    
+    const sessionData = window.gameAPI.getActiveGameSession();
+    if (!sessionData) {
+        alert('No session data available to resume');
+        return;
+    }
+    
+    // Restore game state from session data
+    if (sessionData.coins !== undefined) coins = sessionData.coins;
+    if (sessionData.coupons !== undefined) coupons = sessionData.coupons;
+    if (sessionData.score !== undefined) score = sessionData.score;
+    if (sessionData.reviveCount !== undefined) reviveCount = sessionData.reviveCount;
+    
+    // Start the game
+    gameStarted = true;
+    gameRunning = true;
+    
+    // Hide start screen and show game
+    document.getElementById('startGameInfo').style.display = 'none';
+    
+    // Reset bird to safe starting position
+    bird.y = canvas.height / 2;
+    bird.velocity = 0;
+    
+    // Create first pipe safely positioned using API parameters
+    const safeDistance = Math.max(bird.x + 200, canvas.width - pipeSpacing);
+    createPipe(safeDistance);
+    
+    updateUI();
+}
+
+// Show resume game option
+function showResumeOption() {
+    const startBtn = document.getElementById('startGameBtn');
+    startBtn.textContent = '🔄 Resume Game';
+    startBtn.onclick = resumeGame;
+}
+
+// Show new game option
+function showNewGameOption() {
+    const startBtn = document.getElementById('startGameBtn');
+    startBtn.textContent = '🚀 Start Game';
+    startBtn.onclick = startGame;
+}
+
 // Enable/disable start button based on API status
 function enableStartButton() {
     const startBtn = document.getElementById('startGameBtn');
     if (apiInitialized) {
         startBtn.disabled = false;
-        startBtn.textContent = '🚀 Start Game';
         startBtn.style.opacity = '1';
     } else {
         startBtn.disabled = true;
@@ -210,8 +280,19 @@ function updateUI() {
     cashValueElement.textContent = `₹${cashValue}`;
     couponsElement.textContent = `${coupons}/${couponsToWin || '?'}`;
     
+    // Show/hide revive button based on game state
     reviveBtn.style.display = gameRunning ? 'none' : 'inline-block';
-    reviveBtn.disabled = reviveCount <= 0;
+    
+    // Enable/disable revive button based on API revival data
+    if (window.gameAPI && window.gameAPI.hasRevivalsAvailable()) {
+        reviveBtn.disabled = false;
+        reviveBtn.textContent = 'Revive';
+        reviveBtn.onclick = useRevive;
+    } else {
+        reviveBtn.disabled = true;
+        reviveBtn.textContent = 'Revive (Locked)';
+        reviveBtn.onclick = showLockedRevivalReasons;
+    }
 }
 
 // Create a new pipe
@@ -613,30 +694,79 @@ function jump() {
     }
 }
 
-// Superpower functions
-function useRevive() {
-    if (reviveCount > 0 && !gameRunning) {
-        gameRunning = true;
-        reviveCount--;
-        bird.y = canvas.height / 2;
-        bird.velocity = 0;
-        document.getElementById('gameOverInfo').style.display = 'none';
+// Show locked revival reasons when revive is disabled
+function showLockedRevivalReasons() {
+    if (window.gameAPI) {
+        const lockedReasons = window.gameAPI.getLockedRevivalReasons();
+        const unlockedReasons = window.gameAPI.getUnlockedRevivalReasons();
         
-        // Clear nearby pipes to give player a chance
-        for (let i = pipes.length - 1; i >= 0; i--) {
-            if (pipes[i].x < bird.x + 100 && pipes[i].x > bird.x - 50) {
-                pipes.splice(i, 1);
-            }
+        let message = 'Revival is currently locked.\n\n';
+        
+        if (unlockedReasons.length > 0) {
+            message += 'Available revival methods:\n' + unlockedReasons.join(', ') + '\n\n';
         }
         
-        createParticles(bird.x + bird.width/2, bird.y + bird.height/2, '#FF69B4', 15);
-        updateUI();
+        if (lockedReasons.length > 0) {
+            message += 'Locked revival methods:\n' + lockedReasons.join(', ') + '\n\n';
+            message += 'Complete required actions to unlock these revival methods.';
+        } else {
+            message += 'No revival methods available at this time.';
+        }
+        
+        alert(message);
+    } else {
+        alert('Revival system not available - API not connected.');
     }
 }
+
+// Use revive power-up
+function useRevive() {
+    if (window.gameAPI && window.gameAPI.hasRevivalsAvailable() && !gameRunning) {
+        const unlockedReasons = window.gameAPI.getUnlockedRevivalReasons();
+        
+        // For now, use the first available revival reason
+        if (unlockedReasons.length > 0) {
+            bird.y = canvas.height / 2;
+            bird.velocity = 0;
+            gameRunning = true;
+            document.getElementById('gameOverInfo').style.display = 'none';
+            
+            // Clear nearby pipes to give player a chance
+            for (let i = pipes.length - 1; i >= 0; i--) {
+                if (pipes[i].x < bird.x + 100 && pipes[i].x > bird.x - 50) {
+                    pipes.splice(i, 1);
+                }
+            }
+            
+            // Create revival particles effect
+            createParticles(bird.x + bird.width/2, bird.y + bird.height/2, '#FF69B4', 15);
+            
+            // Mark that revive was used in this session
+            reviveUsedInSession = true;
+            
+            updateUI();
+        }
+    } else {
+        showLockedRevivalReasons();
+    }
+}
+
+
 
 // Game win - player collected required coupons
 function gameWin() {
     gameRunning = false;
+    
+    // Send session data to API
+    if (window.gameAPI && window.gameAPI.isServiceOnline()) {
+        window.gameAPI.updateGameSession({
+            verdict: 'WON',
+            coins: coins,
+            coupons: coupons,
+            reviveUsed: reviveUsedInSession
+        });
+    }
+    
     // Show win message instead of game over
     alert(`🎉 Congratulations! You collected ${couponsToWin} coupons and won the game! 🎉`);
     document.getElementById('gameOverInfo').style.display = 'block';
@@ -646,6 +776,17 @@ function gameWin() {
 // Game over
 function gameOver() {
     gameRunning = false;
+    
+    // Send session data to API
+    if (window.gameAPI && window.gameAPI.isServiceOnline()) {
+        window.gameAPI.updateGameSession({
+            verdict: 'LOST',
+            coins: coins,
+            coupons: coupons,
+            reviveUsed: reviveUsedInSession
+        });
+    }
+    
     document.getElementById('gameOverInfo').style.display = 'block';
     updateUI();
 }
@@ -658,6 +799,7 @@ function restartGame() {
     coins = 0;
     coupons = 0;
     reviveCount = 5;
+    reviveUsedInSession = false; // Reset revive tracking for new session
     bird.y = canvas.height / 2;
     bird.velocity = 0;
     pipes = [];

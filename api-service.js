@@ -1,4 +1,5 @@
 /**
+ * Game API Service for Flappy Bird backend integration
  * API Service for Flappy Bird Game
  * Fetches game parameters from backend API
  */
@@ -9,9 +10,16 @@ class GameAPIService {
         this.customerId = 'shivam'; // Fixed customer ID as per your example
         this.gameInstanceId = null; // Will be set from FLAPPY_BIRD template
         this.gameParameters = null; // Will be set from API only
+        this.winningCriteria = null; // Will be set from API only
+        this.activeGameSession = null; // Current active session
+        this.canResume = false; // Whether game can be resumed
+        this.revivalReasonsUnlocked = []; // Available revival reasons
+        this.revivalReasonsLocked = []; // Locked revival reasons
+        this.revivals = []; // Used revivals
         this.isOnline = false;
         this.isInitialized = false;
         this.onInitializedCallback = null;
+        this.onSyncCompleteCallback = null; // Callback for when sync completes after session update
         
         // Initialize and sync with backend
         this.init();
@@ -84,8 +92,22 @@ class GameAPIService {
                 
 
                 
-                // Store the game instance ID for session updates
+                // Store the game instance ID and session info
                 this.gameInstanceId = flappyBirdGame.gameInstanceId;
+                this.activeGameSession = flappyBirdGame.activeGameSession;
+                this.canResume = flappyBirdGame.canResume || false;
+                
+                // Extract revival information from activeGameSession
+                if (this.activeGameSession) {
+                    this.revivalReasonsUnlocked = this.activeGameSession.revivalReasonsUnlocked || [];
+                    this.revivalReasonsLocked = this.activeGameSession.revivalReasonsLocked || [];
+                    this.revivals = this.activeGameSession.revivals || [];
+                } else {
+                    this.revivalReasonsUnlocked = [];
+                    this.revivalReasonsLocked = [];
+                    this.revivals = [];
+                }
+                
                 this.isOnline = true;
             } else {
                 throw new Error('FLAPPY_BIRD template not found');
@@ -100,24 +122,38 @@ class GameAPIService {
     }
 
     /**
-     * Update game session with results
+     * Update game session with results and sync new state
      * POST /api/games/sessions
      */
     async updateGameSession(gameResults) {
         if (!this.isOnline) {
-            console.warn('API service offline, cannot update session');
-            return null;
+            return false;
         }
 
         try {
+            // Prepare rewards array with COINS and COUPONS
+            const rewards = [
+                {
+                    rewardType: "COINS",
+                    count: gameResults.coins || 0
+                },
+                {
+                    rewardType: "COUPONS", 
+                    count: gameResults.coupons || 0
+                }
+            ];
+
             const sessionData = {
                 customerId: this.customerId,
-                gameInstanceId: this.gameInstanceId || 'flappy-bird-default',
+                gameInstanceId: this.gameInstanceId,
                 verdict: gameResults.verdict, // 'WON' or 'LOST'
-                rewards: gameResults.rewards || []
+                rewards: rewards
             };
-
-            console.log('Updating game session:', sessionData);
+            
+            // Only include gameSessionId if there's an active session and revive was used
+            if (this.activeGameSession && gameResults.reviveUsed) {
+                sessionData.gameSessionId = this.activeGameSession.sessionId;
+            }
 
             const response = await fetch(`${this.baseURL}/api/games/sessions`, {
                 method: 'POST',
@@ -132,11 +168,19 @@ class GameAPIService {
             }
 
             const result = await response.json();
-            console.log('Game session updated successfully:', result);
+            
+            // After session update, sync again to get updated state
+            await this.syncGameParameters();
+            
+            // Notify game that sync is complete and UI should be updated
+            if (this.onSyncCompleteCallback) {
+                this.onSyncCompleteCallback();
+            }
+            
             return result;
         } catch (error) {
-            console.error('Failed to update game session:', error);
-            return null;
+            this.isOnline = false;
+            return false;
         }
     }
 
@@ -152,6 +196,48 @@ class GameAPIService {
      */
     getWinningCriteria() {
         return this.winningCriteria;
+    }
+
+    /**
+     * Check if game can be resumed
+     */
+    canResumeGame() {
+        return this.canResume && this.activeGameSession !== null;
+    }
+
+    /**
+     * Get active game session data
+     */
+    getActiveGameSession() {
+        return this.activeGameSession;
+    }
+
+    /**
+     * Check if revivals are available
+     */
+    hasRevivalsAvailable() {
+        return this.revivalReasonsUnlocked.length > 0;
+    }
+
+    /**
+     * Get unlocked revival reasons
+     */
+    getUnlockedRevivalReasons() {
+        return this.revivalReasonsUnlocked;
+    }
+
+    /**
+     * Get locked revival reasons
+     */
+    getLockedRevivalReasons() {
+        return this.revivalReasonsLocked;
+    }
+
+    /**
+     * Get used revivals count
+     */
+    getUsedRevivalsCount() {
+        return this.revivals.length;
     }
 
     /**
@@ -178,6 +264,13 @@ class GameAPIService {
         if (this.isAPIInitialized()) {
             callback();
         }
+    }
+
+    /**
+     * Set callback for when sync completes after session update
+     */
+    onSyncComplete(callback) {
+        this.onSyncCompleteCallback = callback;
     }
 
     /**
